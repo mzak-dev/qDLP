@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { open as openFileDialog } from "@tauri-apps/plugin-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,9 +8,18 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { createConvert } from "@/lib/api";
 import { CONVERT_FORMATS, type ConvertFormat } from "@/lib/types";
 
-export function NewConvertDialog({ onCreated }: { onCreated: (jobId: string, sourcePath: string) => void }) {
+export function NewConvertDialog({
+  onCreated,
+  defaultSource = "",
+  trigger,
+}: {
+  onCreated: (jobId: string, sourcePath: string) => void;
+  /** Pre-fills the source, e.g. "Convert" on a finished download's own file. */
+  defaultSource?: string;
+  trigger?: ReactNode;
+}) {
   const [open, setOpen] = useState(false);
-  const [source, setSource] = useState("");
+  const [source, setSource] = useState(defaultSource);
   const [format, setFormat] = useState<ConvertFormat>("mp4");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -31,7 +40,7 @@ export function NewConvertDialog({ onCreated }: { onCreated: (jobId: string, sou
       const jobId = await createConvert(source, format);
       onCreated(jobId, source);
       setOpen(false);
-      setSource("");
+      setSource(defaultSource);
     } catch (err) {
       setError(String(err));
     } finally {
@@ -40,10 +49,14 @@ export function NewConvertDialog({ onCreated }: { onCreated: (jobId: string, sou
   }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button variant="outline">New Convert</Button>
-      </DialogTrigger>
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        setOpen(next);
+        if (next) setSource(defaultSource);
+      }}
+    >
+      <DialogTrigger asChild>{trigger ?? <Button variant="outline">New Convert</Button>}</DialogTrigger>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>New Convert</DialogTitle>

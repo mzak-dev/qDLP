@@ -7,8 +7,7 @@
 // YtdlpOptions's fifteen fields on the first pass.
 
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
-import { ArrowLeft, FolderOpen, Star, Trash2 } from "lucide-react";
+import { FolderOpen, Star, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -105,12 +104,7 @@ export default function Settings() {
   }
 
   return (
-    <div className="mx-auto max-w-2xl p-6">
-      <Button asChild variant="ghost" size="sm" className="mb-4 -ml-2">
-        <Link to="/">
-          <ArrowLeft className="mr-1 size-4" /> Library
-        </Link>
-      </Button>
+    <div className="mx-auto h-full max-w-2xl overflow-y-auto p-6">
       <h1 className="mb-6 text-lg font-semibold">Settings</h1>
 
       <Tabs defaultValue="general">
