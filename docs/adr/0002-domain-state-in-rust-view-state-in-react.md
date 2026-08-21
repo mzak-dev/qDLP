@@ -1,0 +1,5 @@
+# Domain state lives in Rust; view state lives in React
+
+Rust owns every Job/Item/File/Preset/setting, persisted to SQLite and exposed only through `#[tauri::command]`s and the "job-event"/"convert-event" pushes. React never holds a mutable copy of that data — a component either fetches it fresh (`listJobs`, `getJob`) or subscribes to the live event bus for the one job it's currently rendering. React's own `useState` is reserved for things Rust has no reason to know about: which route is active, whether a dialog is open, a preset-editor draft.
+
+This is a direct reaction to rustyDLP's `app.rs`: one 3,205-line gpui entity with 39 fields mixing view state and domain state and player lifecycle, which is what made it the file everyone was afraid to touch. The port's whole point was replacing the UI; keeping the state model that produced that file — just translated into a giant `useState`/Zustand blob — would have thrown away the actual win. The process boundary between Tauri's IPC and React makes the split structural instead of a naming convention someone has to keep honoring by hand.

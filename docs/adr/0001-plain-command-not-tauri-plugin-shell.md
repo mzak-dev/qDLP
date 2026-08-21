@@ -1,0 +1,5 @@
+# Spawn yt-dlp/ffmpeg with plain std::process::Command, not tauri_plugin_shell
+
+yt-dlp and ffmpeg are launched with `std::process::Command` directly (see `runner.rs`), not through Tauri's `tauri_plugin_shell` sidecar API, even though sidecars are the framework's blessed mechanism for exactly this. Two reasons. First, `yt-dlp.exe -U` self-overwrites its own binary, which only works from a location the app can write to without elevation — `%LOCALAPPDATA%\qDLP\bin`, not wherever `tauri_plugin_shell` resolves a sidecar to at runtime. Second, four working spawn sites (download, probe, convert, update) already handle `CREATE_NO_WINDOW` and PATH-prepending correctly; rewriting them against a different API would cost real work for no behavioral gain.
+
+`bundle.externalBin` is still used, but only as the *installer's* mechanism for shipping the binaries in the first place — `seed.rs` copies them from there into the writable app-data bin dir on first run. Invocation always goes through `runner.rs`'s own resolution order and plain `Command`, never through `tauri_plugin_shell::sidecar()`.

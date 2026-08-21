@@ -1,0 +1,72 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Only the release job writes anything; everything else is read-only.
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: windows-latest # runner.rs is cfg(windows) top to bottom; nothing else can build it
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: "pnpm"
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec tsc --noEmit
+      - run: cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
+      - run: cargo test --manifest-path src-tauri/Cargo.toml
+
+  build:
+    needs: test
+    runs-on: windows-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: "pnpm"
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+      - run: pnpm install --frozen-lockfile
+      # Cargo.toml is the single source of truth for the version, so read it back.
+      - id: version
+        shell: bash
+        run: echo "version=$(cargo metadata --no-deps --manifest-path src-tauri/Cargo.toml --format-version 1 | grep -o '"version":"[^"]*"' | head -1 | cut -d'"' -f4)" >> "$GITHUB_OUTPUT"
+      # externalBin binaries (yt-dlp/ffmpeg/ffprobe) must already exist under
+      # src-tauri/binaries/ for this to succeed — see docs/adr/0001.
+      - run: pnpm tauri build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: qdlp-${{ steps.version.outputs.version }}
+          path: src-tauri/target/release/bundle/nsis/*.exe
+
+  release:
+    if: github.event_name == 'push'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # creates the tag and the release
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: qdlp-${{ needs.build.outputs.version }}
+      - env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          VERSION: ${{ needs.build.outputs.version }}
+        run: gh release create "v$VERSION" --target "$GITHUB_SHA" --generate-notes ./*.exe
