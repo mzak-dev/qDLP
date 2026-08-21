@@ -51,6 +51,25 @@ struct ConvertEventPayload {
     event: ConvertEvent,
 }
 
+/// A blank or relative download_dir isn't merely unhelpful — YtdlpOptions
+/// only emits `-P <dir>` when download_dir is non-empty (ytdlp.rs), so an
+/// empty string here silently drops the flag entirely and yt-dlp falls back
+/// to its *own* process cwd. Under `cargo tauri dev` that cwd is
+/// `src-tauri/`, which is how a real download once landed inside the
+/// source tree instead of anywhere a user picked. Commands are an IPC
+/// boundary — validate here, not just in the dialog that happens to be the
+/// only caller today.
+fn require_download_dir(download_dir: &str) -> Result<(), String> {
+    if download_dir.trim().is_empty() {
+        return Err("a download folder is required".to_string());
+    }
+    let path = std::path::Path::new(download_dir);
+    if !path.is_absolute() {
+        return Err(format!("download folder must be an absolute path, got {download_dir:?}"));
+    }
+    std::fs::create_dir_all(path).map_err(|e| format!("could not create download folder {download_dir:?}: {e}"))
+}
+
 fn default_options(download_dir: String) -> YtdlpOptions {
     // The same 1080p/mp4/embed-everything shape as Preset::seeds's
     // "Best (1080p mp4)" — the real preset picker is still a later phase.
@@ -220,6 +239,7 @@ pub async fn create_download(
     url: String,
     download_dir: String,
 ) -> Result<String, String> {
+    require_download_dir(&download_dir)?;
     let mut job = Job::new(&url, "default");
     job.title = url.clone();
     job.state = JobState::Running;
@@ -261,7 +281,10 @@ pub async fn retry_job(app: AppHandle, state: State<'_, AppState>, job_id: Strin
     job.error = None;
 
     match job.kind {
-        JobKind::Download => launch_download(app, &state, job, default_options(download_dir)),
+        JobKind::Download => {
+            require_download_dir(&download_dir)?;
+            launch_download(app, &state, job, default_options(download_dir))
+        }
         JobKind::Convert => {
             let format = ConvertFormat::parse(&job.preset);
             launch_convert(app, &state, job, format)
@@ -349,4 +372,34 @@ pub fn reveal_file(path: String) {
 #[tauri::command]
 pub fn open_bin_dir() {
     runner::open_bin_dir();
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn empty_download_dir_is_rejected() {
+        assert!(require_download_dir("").is_err());
+        assert!(require_download_dir("   ").is_err());
+    }
+
+    /// The actual regression: an empty download_dir used to mean "no -P
+    /// flag at all", not "current directory" — but the effect was the same
+    /// (yt-dlp writes into its own cwd), so this must be caught before a
+    /// spawn, not discovered by finding files in src-tauri/ afterward.
+    #[test]
+    fn relative_download_dir_is_rejected() {
+        assert!(require_download_dir("Downloads").is_err());
+        assert!(require_download_dir("./Downloads").is_err());
+    }
+
+    #[test]
+    fn valid_absolute_dir_is_created_if_missing() {
+        let dir = std::env::temp_dir().join(crate::model::new_id("dl-dir-test"));
+        assert!(!dir.exists());
+        require_download_dir(dir.to_str().unwrap()).unwrap();
+        assert!(dir.is_dir());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
 }
