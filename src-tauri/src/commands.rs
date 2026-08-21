@@ -154,6 +154,7 @@ fn launch_download(app: AppHandle, state: &State<'_, AppState>, mut job: Job, op
 fn launch_convert(app: AppHandle, state: &State<'_, AppState>, mut job: Job, format: ConvertFormat) -> Result<String, String> {
     let ffmpeg = runner::ffmpeg_path(None).map_err(|e| e.to_string())?;
     let convert = runner::spawn_convert(&ffmpeg, std::path::Path::new(&job.url), format).map_err(|e| e.to_string())?;
+    let output_path = convert.output_path.to_string_lossy().to_string();
 
     state.store.lock().unwrap().save_job(&job).map_err(|e| e.to_string())?;
     state.running.lock().unwrap().insert(
@@ -181,6 +182,18 @@ fn launch_convert(app: AppHandle, state: &State<'_, AppState>, mut job: Job, for
                 };
                 job.error =
                     (job.state != JobState::Done).then(|| if finished.last_log.is_empty() { line.clone() } else { finished.last_log });
+                if job.state == JobState::Done && job.items.is_empty() {
+                    let bytes = std::fs::metadata(&output_path).ok().map(|m| m.len() as i64);
+                    job.items.push(Item {
+                        id: new_id("itm"),
+                        index: 0,
+                        title: job.title.clone(),
+                        duration: None,
+                        thumb_path: None,
+                        webpage_url: String::new(),
+                        files: vec![File { id: new_id("fil"), path: output_path.clone(), kind: classify(&output_path), format_id: None, bytes }],
+                    });
+                }
                 let _ = app_state.store.lock().unwrap().save_job(&job);
             } else if let Some(running) = app_state.running.lock().unwrap().get_mut(&job_id) {
                 running.last_log = line.clone();
@@ -250,7 +263,7 @@ pub async fn retry_job(app: AppHandle, state: State<'_, AppState>, job_id: Strin
     match job.kind {
         JobKind::Download => launch_download(app, &state, job, default_options(download_dir)),
         JobKind::Convert => {
-            let format = ConvertFormat::parse(&job.preset.clone());
+            let format = ConvertFormat::parse(&job.preset);
             launch_convert(app, &state, job, format)
         }
     }
