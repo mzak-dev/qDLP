@@ -52,9 +52,12 @@ export function VideoPlayer({ path }: { path: string }) {
       // next mouse move — wrong instinct for a paused library video the
       // user just opened; keep it visible until they actually play it.
       inactivityTimeout: 0,
-      // We already show our own fallback UI on error (below); video.js's
-      // built-in error modal would otherwise show *as well*, duplicating it.
-      children: { errorDisplay: false },
+      // NOT `children: { errorDisplay: false }` — per video.js's own docs,
+      // passing `children` at all replaces the *entire* default children
+      // list with only what's named, not just the one key. That silently
+      // deleted the control bar and big-play-button along with the error
+      // display. The CSS rule in index.css (.vjs-error-display) is the only
+      // suppression needed; our own fallback UI already covers the error case.
     });
     player.on("error", () => setFailed(true));
     playerRef.current = player;
