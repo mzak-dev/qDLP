@@ -65,6 +65,7 @@ export function getSetting(key: string): Promise<string | null> {
 }
 
 export function setSetting(key: string, value: string): Promise<void> {
+  if (!isTauri()) return Promise.resolve();
   return invoke("set_setting", { key, value });
 }
 
