@@ -136,9 +136,21 @@ export default function App() {
 
           <div className="flex-1 space-y-0.5 overflow-y-auto p-2 pt-1">
             {filtered.length === 0 && <p className="text-muted-foreground px-2 py-4 text-xs">No jobs yet.</p>}
-            {filtered.map((job) => (
-              <JobListItem key={job.id} job={job} />
-            ))}
+            <AnimatePresence initial={false} mode="popLayout">
+              {filtered.map((job) => (
+                <motion.div
+                  key={job.id}
+                  layout
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: "auto" }}
+                  exit={{ opacity: 0, height: 0 }}
+                  transition={{ duration: 0.18, ease: "easeOut" }}
+                  className="overflow-hidden"
+                >
+                  <JobListItem job={job} />
+                </motion.div>
+              ))}
+            </AnimatePresence>
           </div>
 
           <div className="flex shrink-0 flex-col gap-1.5 border-t p-2">
