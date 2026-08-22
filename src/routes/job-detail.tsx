@@ -51,7 +51,9 @@ export default function JobDetail() {
 
         {job.error && <p className="text-destructive mt-3 text-sm">{job.error}</p>}
 
-        <h1 className="mt-4 text-lg font-semibold break-words">{job.title || job.url}</h1>
+        <h1 data-morph-target={job.id} className="mt-4 text-lg font-semibold break-words">
+          {job.title || job.url}
+        </h1>
 
         <div className="mt-3 flex flex-wrap gap-2">
           {firstVideo && (
