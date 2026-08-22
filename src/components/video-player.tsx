@@ -10,6 +10,14 @@ import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { openFile } from "@/lib/api";
 import { isLikelyPlayable } from "@/lib/media";
+import { isTauri } from "@/lib/tauri-env";
+
+// convertFileSrc reads window.__TAURI_INTERNALS__ unguarded and throws
+// synchronously outside the real shell — fatal with no error boundary above
+// this component, so browser-preview mode needs its own path.
+function assetSrc(path: string): string {
+  return isTauri() ? convertFileSrc(path) : path;
+}
 
 function formatTime(seconds: number): string {
   if (!Number.isFinite(seconds)) return "0:00";
@@ -52,7 +60,7 @@ export function VideoPlayer({ path }: { path: string }) {
     <div className="flex flex-col gap-2">
       <video
         ref={videoRef}
-        src={convertFileSrc(path)}
+        src={assetSrc(path)}
         className="w-full rounded-lg bg-black"
         onError={() => setFailed(true)}
         onLoadedMetadata={(e) => setDuration(e.currentTarget.duration)}

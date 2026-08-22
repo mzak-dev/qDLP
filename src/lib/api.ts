@@ -2,8 +2,14 @@
 // keeps invoke()'s stringly-typed name and its argument-name camelCasing
 // (Tauri auto-converts JS camelCase args to Rust's snake_case params) in
 // exactly one place per command.
+//
+// Outside the real Tauri shell (see tauri-env.ts), reads fall back to fixed
+// mock data and writes become no-ops, so the UI can be opened in a plain
+// browser tab for layout/CSS iteration. Never triggered in the shipped app.
 
 import { invoke } from "@tauri-apps/api/core";
+import { isTauri } from "./tauri-env";
+import { MOCK_JOBS } from "./mock-data";
 import type { ConvertFormat, Job, Preset, Probe } from "./types";
 
 export function probeUrl(url: string): Promise<Probe> {
@@ -27,10 +33,12 @@ export function cancelJob(jobId: string): Promise<void> {
 }
 
 export function listJobs(): Promise<Job[]> {
+  if (!isTauri()) return Promise.resolve(MOCK_JOBS);
   return invoke("list_jobs");
 }
 
 export function getJob(jobId: string): Promise<Job | null> {
+  if (!isTauri()) return Promise.resolve(MOCK_JOBS.find((j) => j.id === jobId) ?? null);
   return invoke("get_job", { jobId });
 }
 
@@ -39,6 +47,7 @@ export function deleteJob(jobId: string): Promise<void> {
 }
 
 export function listPresets(): Promise<Preset[]> {
+  if (!isTauri()) return Promise.resolve([]);
   return invoke("list_presets");
 }
 
@@ -51,6 +60,7 @@ export function deletePreset(name: string): Promise<void> {
 }
 
 export function getSetting(key: string): Promise<string | null> {
+  if (!isTauri()) return Promise.resolve(key === "download_dir" ? "C:\\Downloads" : null);
   return invoke("get_setting", { key });
 }
 
@@ -63,10 +73,12 @@ export function updateYtdlp(): Promise<string> {
 }
 
 export function openFile(path: string): Promise<void> {
+  if (!isTauri()) return Promise.resolve();
   return invoke("open_file", { path });
 }
 
 export function revealFile(path: string): Promise<void> {
+  if (!isTauri()) return Promise.resolve();
   return invoke("reveal_file", { path });
 }
 

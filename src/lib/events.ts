@@ -6,6 +6,7 @@
 // combination the plan flagged as a perf risk if a tick re-rendered the row.
 
 import { listen } from "@tauri-apps/api/event";
+import { isTauri } from "./tauri-env";
 import type { ConvertEventPayload, JobEvent, JobEventPayload } from "./types";
 
 // A download's JobEvent and a convert's ConvertEvent are structurally
@@ -17,7 +18,7 @@ const listeners = new Map<string, Set<Listener>>();
 let started = false;
 
 export function startJobEventBus() {
-  if (started) return;
+  if (started || !isTauri()) return;
   started = true;
   void listen<JobEventPayload>("job-event", ({ payload }) => {
     listeners.get(payload.job_id)?.forEach((fn) => fn(payload.event));
