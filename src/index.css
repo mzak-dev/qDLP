@@ -129,9 +129,73 @@
     }
 }
 
-/* Belt-and-suspenders alongside the `children: { errorDisplay: false }`
-   player option — video-player.tsx already shows its own fallback UI on
-   error, so video.js's built-in modal would only ever duplicate it. */
+/* video-player.tsx already shows its own fallback UI on error, so video.js's
+   built-in modal would only ever duplicate it. */
 .video-js .vjs-error-display {
   display: none !important;
+}
+
+/* A modern skin over video.js's default control bar — colors, radii, blur,
+   and icon sizing only. Deliberately does NOT touch any position/width/
+   height/flex rule on .video-js, .vjs-fill, or .vjs-control-bar itself:
+   those control the letterboxed-fill sizing fix, and two earlier rounds of
+   "restyle this" broke it by wandering into layout territory. Everything
+   below only restyles existing descendants in place. */
+
+.video-js .vjs-control-bar {
+  background: linear-gradient(to top, rgb(0 0 0 / 75%), transparent);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+
+.video-js .vjs-button > .vjs-icon-placeholder:before {
+  font-size: 1.9em;
+  line-height: 1.55;
+}
+
+.video-js .vjs-control:hover {
+  background-color: rgb(255 255 255 / 12%);
+  border-radius: 999px;
+}
+
+.video-js .vjs-progress-holder {
+  height: 0.35em;
+  border-radius: 999px;
+}
+
+.video-js .vjs-load-progress,
+.video-js .vjs-load-progress div {
+  border-radius: 999px;
+  background: rgb(255 255 255 / 25%);
+}
+
+.video-js .vjs-play-progress {
+  border-radius: 999px;
+  background: var(--primary);
+}
+
+.video-js .vjs-play-progress:before {
+  font-size: 0.9em;
+  color: var(--primary);
+  filter: drop-shadow(0 0 2px rgb(0 0 0 / 50%));
+}
+
+.video-js .vjs-volume-level {
+  background: var(--primary);
+}
+
+.video-js .vjs-big-play-button {
+  width: 2.5em;
+  height: 2.5em;
+  line-height: 2.5em;
+  border-radius: 50%;
+  border: none;
+  background: rgb(0 0 0 / 55%);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  transition: background-color 0.15s ease;
+}
+
+.video-js:hover .vjs-big-play-button {
+  background: rgb(0 0 0 / 75%);
 }
