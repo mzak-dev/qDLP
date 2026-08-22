@@ -18,6 +18,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { open as openFolderDialog } from "@tauri-apps/plugin-dialog";
 import { deletePreset, getSetting, listPresets, openBinDir, savePreset, setSetting, updateYtdlp } from "@/lib/api";
+import { useTheme } from "@/lib/theme";
+import type { ThemePreference } from "@/lib/theme";
 import type { FormatMode, Preset, YtdlpOptions } from "@/lib/types";
 
 const DEFAULT_OPTIONS: YtdlpOptions = {
@@ -48,6 +50,7 @@ function toSimpleFormat(f: FormatMode): SimpleFormat {
 }
 
 export default function Settings() {
+  const { preference, setPreference } = useTheme();
   const [downloadDir, setDownloadDir] = useState("");
   const [presets, setPresets] = useState<Preset[]>([]);
   const [ytdlpStatus, setYtdlpStatus] = useState<string | null>(null);
@@ -114,6 +117,22 @@ export default function Settings() {
         </TabsList>
 
         <TabsContent value="general" className="flex flex-col gap-6">
+          <div className="space-y-1.5">
+            <Label>Theme</Label>
+            <Select value={preference} onValueChange={(v: ThemePreference) => setPreference(v)}>
+              <SelectTrigger className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="light">Light</SelectItem>
+                <SelectItem value="dark">Dark</SelectItem>
+                <SelectItem value="system">System</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <Separator />
+
           <div className="space-y-1.5">
             <Label>Default download folder</Label>
             <div className="flex gap-2">

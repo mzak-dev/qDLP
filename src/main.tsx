@@ -5,6 +5,7 @@ import App from "./App";
 import Library from "./routes/library";
 import JobDetail from "./routes/job-detail";
 import Settings from "./routes/settings";
+import { ThemeProvider } from "./components/theme-provider";
 import "./index.css";
 
 // HashRouter, not BrowserRouter: the built app is served from a file:// (or
@@ -12,14 +13,16 @@ import "./index.css";
 // link — the hash never leaves the client, so it always resolves.
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   <React.StrictMode>
-    <HashRouter>
-      <Routes>
-        <Route element={<App />}>
-          <Route index element={<Library />} />
-          <Route path="job/:id" element={<JobDetail />} />
-          <Route path="settings" element={<Settings />} />
-        </Route>
-      </Routes>
-    </HashRouter>
+    <ThemeProvider>
+      <HashRouter>
+        <Routes>
+          <Route element={<App />}>
+            <Route index element={<Library />} />
+            <Route path="job/:id" element={<JobDetail />} />
+            <Route path="settings" element={<Settings />} />
+          </Route>
+        </Routes>
+      </HashRouter>
+    </ThemeProvider>
   </React.StrictMode>,
 );
