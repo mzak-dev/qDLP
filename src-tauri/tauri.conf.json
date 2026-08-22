@@ -14,7 +14,8 @@
       {
         "title": "qDLP",
         "width": 1180,
-        "height": 760
+        "height": 760,
+        "decorations": false
       }
     ],
     "security": {

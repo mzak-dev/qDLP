@@ -4,7 +4,8 @@
 // keeps both on screen at once, matching the original app's layout.
 
 import { useCallback, useEffect, useState } from "react";
-import { Link, Outlet } from "react-router-dom";
+import { Link, useLocation, useOutlet } from "react-router-dom";
+import { AnimatePresence, motion } from "framer-motion";
 import { ListFilter, Settings as SettingsIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -19,8 +20,9 @@ import {
 import { NewDownloadDialog } from "@/components/new-download-dialog";
 import { NewConvertDialog } from "@/components/new-convert-dialog";
 import { JobListItem } from "@/components/job-list-item";
+import { TitleBar } from "@/components/title-bar";
 import { startJobEventBus } from "@/lib/events";
-import { deleteJob, getSetting, listJobs, retryJob } from "@/lib/api";
+import { deleteJob, getJob, getSetting, listJobs, retryJob } from "@/lib/api";
 import { isActive, type Job, type JobKind } from "@/lib/types";
 import type { JobsContext } from "@/lib/jobs-context";
 
@@ -65,7 +67,12 @@ export default function App() {
   );
 
   const onSettled = useCallback(
-    (job: Job, ok: boolean, detail: string) => upsert({ ...job, state: ok ? "done" : "failed", error: ok ? null : detail }),
+    (job: Job, ok: boolean, detail: string) => {
+      // Re-fetch rather than spreading the stale in-memory job: the title
+      // (and items/files) may only have become known server-side during
+      // the run, and this locally-held object was captured before that.
+      void getJob(job.id).then((fresh) => upsert(fresh ?? { ...job, state: ok ? "done" : "failed", error: ok ? null : detail }));
+    },
     [upsert],
   );
 
@@ -88,14 +95,12 @@ export default function App() {
   const context: JobsContext = { jobs, liveIds, onCreated, onSettled, onRetry: (j) => void onRetry(j), onDelete: (j) => void onDelete(j) };
 
   const filterActive = stateFilter !== "all" || kindFilter !== "all";
+  const location = useLocation();
+  const outlet = useOutlet(context);
 
   return (
     <div className="flex h-screen flex-col">
-      <header className="flex shrink-0 items-center border-b px-4 py-3">
-        <Link to="/" className="text-base font-semibold tracking-tight">
-          qDLP
-        </Link>
-      </header>
+      <TitleBar />
 
       <div className="flex flex-1 overflow-hidden">
         <aside className="flex w-64 shrink-0 flex-col overflow-hidden border-r">
@@ -147,8 +152,19 @@ export default function App() {
           </div>
         </aside>
 
-        <main className="flex-1 overflow-hidden">
-          <Outlet context={context} />
+        <main className="relative flex-1 overflow-hidden">
+          <AnimatePresence initial={false}>
+            <motion.div
+              key={location.pathname}
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -6 }}
+              transition={{ duration: 0.16, ease: "easeOut" }}
+              className="absolute inset-0"
+            >
+              {outlet}
+            </motion.div>
+          </AnimatePresence>
         </main>
       </div>
     </div>
