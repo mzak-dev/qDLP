@@ -128,3 +128,10 @@
     @apply font-sans;
     }
 }
+
+/* Belt-and-suspenders alongside the `children: { errorDisplay: false }`
+   player option — video-player.tsx already shows its own fallback UI on
+   error, so video.js's built-in modal would only ever duplicate it. */
+.video-js .vjs-error-display {
+  display: none !important;
+}

@@ -5,8 +5,14 @@
 // Video.js takes DOM ownership of the element it's given, so this follows
 // the library's own recommended React pattern: create the player once on
 // mount into an *inner* div React never touches again, then on a source
-// change call player.src(...) instead of unmounting/remounting — doing the
-// latter fights Video.js for control of the DOM node.
+// change call player.src(...) instead of unmounting/remounting.
+//
+// The container div is *never* conditionally unmounted, even on failure —
+// it used to be (early-returning a different JSX branch when `failed` was
+// true), which meant React tore down the DOM subtree Video.js had taken
+// over out from under it the moment a video failed to load. The fallback
+// message is an overlay instead, so the same DOM node lives for the whole
+// component lifetime and only React (never Video.js) owns whether it exists.
 
 import { useEffect, useRef, useState } from "react";
 import { convertFileSrc } from "@tauri-apps/api/core";
@@ -38,13 +44,18 @@ export function VideoPlayer({ path }: { path: string }) {
     videoEl.classList.add("vjs-big-play-centered");
     containerRef.current.appendChild(videoEl);
 
-    // fill (not fluid): fluid sizes purely off the source's own aspect
-    // ratio, so a portrait/Shorts-style video grows to whatever height
-    // matches full container width — here that meant a video taller than
-    // the viewport with its own control bar scrolled out of view. fill
-    // makes the player match its parent box exactly (the aspect-video div
-    // below), and video.js letterboxes anything that isn't 16:9 inside it.
-    const player = videojs(videoEl, { controls: true, fill: true, preload: "metadata" });
+    const player = videojs(videoEl, {
+      controls: true,
+      fill: true,
+      preload: "metadata",
+      // Default is 2000ms, after which the control bar fades out until the
+      // next mouse move — wrong instinct for a paused library video the
+      // user just opened; keep it visible until they actually play it.
+      inactivityTimeout: 0,
+      // We already show our own fallback UI on error (below); video.js's
+      // built-in error modal would otherwise show *as well*, duplicating it.
+      children: { errorDisplay: false },
+    });
     player.on("error", () => setFailed(true));
     playerRef.current = player;
 
@@ -62,20 +73,21 @@ export function VideoPlayer({ path }: { path: string }) {
     player.src({ src: assetSrc(path) });
   }, [path, attemptPlayback]);
 
-  if (!attemptPlayback || failed) {
-    return (
-      <div className="bg-muted flex flex-col items-center justify-center gap-3 rounded-lg p-16">
-        <p className="text-muted-foreground text-sm">
-          {attemptPlayback ? "Playback failed in-app." : "This format isn't supported in-app."}
-        </p>
-        <Button onClick={() => void openFile(path)}>Open externally</Button>
-      </div>
-    );
-  }
+  const showFallback = !attemptPlayback || failed;
 
   return (
-    <div data-vjs-player className="relative aspect-video w-full overflow-hidden rounded-lg bg-black">
-      <div ref={containerRef} className="absolute inset-0" />
+    <div className="relative aspect-video w-full overflow-hidden rounded-lg bg-black">
+      <div data-vjs-player className="absolute inset-0" style={{ visibility: showFallback ? "hidden" : "visible" }}>
+        <div ref={containerRef} className="absolute inset-0" />
+      </div>
+      {showFallback && (
+        <div className="bg-muted absolute inset-0 flex flex-col items-center justify-center gap-3">
+          <p className="text-muted-foreground text-sm">
+            {attemptPlayback ? "Playback failed in-app." : "This format isn't supported in-app."}
+          </p>
+          <Button onClick={() => void openFile(path)}>Open externally</Button>
+        </div>
+      )}
     </div>
   );
 }
