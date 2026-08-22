@@ -4,7 +4,7 @@ use crate::domain::{classify, is_retryable, sibling_thumbnail, state_after_failu
 use crate::model::{File, Item, Job, JobKind, JobState, Preset, new_id};
 use crate::runner::{self, CancelHandle, ConvertEvent, ConvertFormat};
 use crate::store::Store;
-use crate::ytdlp::{Event, YtdlpOptions};
+use crate::ytdlp::{Event, InfoLine, YtdlpOptions};
 use futures::StreamExt;
 use std::collections::HashMap;
 use std::sync::Mutex;
@@ -70,6 +70,29 @@ fn require_download_dir(download_dir: &str) -> Result<(), String> {
     std::fs::create_dir_all(path).map_err(|e| format!("could not create download folder {download_dir:?}: {e}"))
 }
 
+/// job.title starts out as the raw URL (create_download has nothing better
+/// yet); this is what revises it once yt-dlp reports the real one. Without
+/// it, every download permanently showed its URL in the sidebar instead of
+/// its name — nothing else ever wrote to job.title after creation. First
+/// video's title wins for both a single download and a playlist; good
+/// enough until presets carry an explicit playlist-title concept.
+fn apply_info(job: &mut Job, info: &InfoLine) {
+    if job.items.is_empty() && job.title == job.url {
+        if let Some(title) = &info.title {
+            job.title = title.clone();
+        }
+    }
+    job.items.push(Item {
+        id: new_id("itm"),
+        index: info.playlist_index.unwrap_or(job.items.len() as i64),
+        title: info.title.clone().unwrap_or_default(),
+        duration: info.duration,
+        thumb_path: info.thumbnail.clone(),
+        webpage_url: info.webpage_url.clone().unwrap_or_default(),
+        files: Vec::new(),
+    });
+}
+
 fn default_options(download_dir: String) -> YtdlpOptions {
     // The same 1080p/mp4/embed-everything shape as Preset::seeds's
     // "Best (1080p mp4)" — the real preset picker is still a later phase.
@@ -111,15 +134,7 @@ fn launch_download(app: AppHandle, state: &State<'_, AppState>, mut job: Job, op
             // the job settles and the page is revisited or the app restarts.
             match &event {
                 Event::Info(info) => {
-                    job.items.push(Item {
-                        id: new_id("itm"),
-                        index: info.playlist_index.unwrap_or(job.items.len() as i64),
-                        title: info.title.clone().unwrap_or_default(),
-                        duration: info.duration,
-                        thumb_path: info.thumbnail.clone(),
-                        webpage_url: info.webpage_url.clone().unwrap_or_default(),
-                        files: Vec::new(),
-                    });
+                    apply_info(&mut job, info);
                     continue;
                 }
                 Event::File(path) => {
@@ -401,5 +416,32 @@ mod tests {
         require_download_dir(dir.to_str().unwrap()).unwrap();
         assert!(dir.is_dir());
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn first_info_line_replaces_the_url_placeholder_title() {
+        let mut job = Job::new("https://youtu.be/abc123", "default");
+        job.title = job.url.clone(); // create_download's actual starting state
+        apply_info(&mut job, &InfoLine { title: Some("Real Video Title".into()), ..Default::default() });
+        assert_eq!(job.title, "Real Video Title");
+        assert_eq!(job.items.len(), 1);
+    }
+
+    #[test]
+    fn a_title_the_user_already_set_is_not_overwritten() {
+        let mut job = Job::new("https://youtu.be/abc123", "default");
+        job.title = "Chosen preset title".into(); // not equal to job.url
+        apply_info(&mut job, &InfoLine { title: Some("Real Video Title".into()), ..Default::default() });
+        assert_eq!(job.title, "Chosen preset title");
+    }
+
+    #[test]
+    fn only_the_first_info_line_affects_the_title() {
+        let mut job = Job::new("https://youtu.be/playlist", "default");
+        job.title = job.url.clone();
+        apply_info(&mut job, &InfoLine { title: Some("First".into()), ..Default::default() });
+        apply_info(&mut job, &InfoLine { title: Some("Second".into()), ..Default::default() });
+        assert_eq!(job.title, "First");
+        assert_eq!(job.items.len(), 2);
     }
 }
