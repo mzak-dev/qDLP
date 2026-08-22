@@ -5,8 +5,17 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { Link, Outlet } from "react-router-dom";
-import { Settings as SettingsIcon } from "lucide-react";
+import { ListFilter, Settings as SettingsIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { NewDownloadDialog } from "@/components/new-download-dialog";
 import { NewConvertDialog } from "@/components/new-convert-dialog";
 import { JobListItem } from "@/components/job-list-item";
@@ -78,39 +87,49 @@ export default function App() {
   const filtered = jobs.filter((j) => matches(j, stateFilter, kindFilter));
   const context: JobsContext = { jobs, liveIds, onCreated, onSettled, onRetry: (j) => void onRetry(j), onDelete: (j) => void onDelete(j) };
 
+  const filterActive = stateFilter !== "all" || kindFilter !== "all";
+
   return (
     <div className="flex h-screen flex-col">
-      <header className="flex shrink-0 items-center border-b px-4 py-2.5">
-        <Link to="/" className="text-sm font-semibold tracking-tight">
+      <header className="flex shrink-0 items-center border-b px-4 py-3">
+        <Link to="/" className="text-base font-semibold tracking-tight">
           qDLP
         </Link>
       </header>
 
       <div className="flex flex-1 overflow-hidden">
         <aside className="flex w-64 shrink-0 flex-col overflow-hidden border-r">
-          <div className="flex shrink-0 flex-wrap gap-1 px-2 pt-2">
-            {(["all", "active", "done", "failed"] as StateFilter[]).map((f) => (
-              <button
-                key={f}
-                onClick={() => setStateFilter(f)}
-                className={`rounded px-1.5 py-0.5 text-xs capitalize ${stateFilter === f ? "bg-secondary text-secondary-foreground" : "text-muted-foreground hover:text-foreground"}`}
-              >
-                {f}
-              </button>
-            ))}
-            <span className="text-muted-foreground/40 px-0.5 text-xs">·</span>
-            {(["all", "download", "convert"] as KindFilter[]).map((f) => (
-              <button
-                key={f}
-                onClick={() => setKindFilter(f)}
-                className={`rounded px-1.5 py-0.5 text-xs capitalize ${kindFilter === f ? "bg-secondary text-secondary-foreground" : "text-muted-foreground hover:text-foreground"}`}
-              >
-                {f}
-              </button>
-            ))}
+          <div className="flex shrink-0 items-center justify-between px-3 pt-3 pb-1">
+            <span className="text-muted-foreground text-xs font-medium tracking-wide uppercase">Library</span>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button size="icon" variant="ghost" className={`size-6 ${filterActive ? "text-foreground" : "text-muted-foreground"}`}>
+                  <ListFilter className="size-3.5" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuLabel>State</DropdownMenuLabel>
+                <DropdownMenuRadioGroup value={stateFilter} onValueChange={(v) => setStateFilter(v as StateFilter)}>
+                  {(["all", "active", "done", "failed"] as StateFilter[]).map((f) => (
+                    <DropdownMenuRadioItem key={f} value={f} className="capitalize">
+                      {f}
+                    </DropdownMenuRadioItem>
+                  ))}
+                </DropdownMenuRadioGroup>
+                <DropdownMenuSeparator />
+                <DropdownMenuLabel>Kind</DropdownMenuLabel>
+                <DropdownMenuRadioGroup value={kindFilter} onValueChange={(v) => setKindFilter(v as KindFilter)}>
+                  {(["all", "download", "convert"] as KindFilter[]).map((f) => (
+                    <DropdownMenuRadioItem key={f} value={f} className="capitalize">
+                      {f}
+                    </DropdownMenuRadioItem>
+                  ))}
+                </DropdownMenuRadioGroup>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
 
-          <div className="flex-1 space-y-0.5 overflow-y-auto p-2">
+          <div className="flex-1 space-y-0.5 overflow-y-auto p-2 pt-1">
             {filtered.length === 0 && <p className="text-muted-foreground px-2 py-4 text-xs">No jobs yet.</p>}
             {filtered.map((job) => (
               <JobListItem key={job.id} job={job} />

@@ -12,14 +12,9 @@ function subtitle(job: Job): string {
 
 export function JobListItem({ job }: { job: Job }) {
   return (
-    <NavLink
-      to={`/job/${job.id}`}
-      className={({ isActive }) =>
-        `block rounded px-2 py-1.5 ${isActive ? "bg-secondary" : "hover:bg-secondary/50"}`
-      }
-    >
+    <NavLink to={`/job/${job.id}`} className={({ isActive }) => `block rounded-md px-2.5 py-2 ${isActive ? "bg-secondary" : "hover:bg-secondary/50"}`}>
       <p className="truncate text-sm font-medium">{job.title || job.url}</p>
-      <p className="text-muted-foreground truncate text-xs capitalize">{subtitle(job)}</p>
+      <p className="text-muted-foreground mt-0.5 truncate text-xs capitalize">{subtitle(job)}</p>
     </NavLink>
   );
 }
