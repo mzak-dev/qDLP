@@ -196,3 +196,8 @@ export function isActive(state: JobState): boolean {
 export function isRetryable(state: JobState): boolean {
   return state === "failed" || state === "cancelled";
 }
+
+/** The video file to preview/play for a job, if any of its items has one yet. */
+export function firstVideoFile(job: Job): QFile | null {
+  return job.items.flatMap((i) => i.files).find((f) => f.kind === "video") ?? null;
+}

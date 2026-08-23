@@ -90,6 +90,30 @@
     }
 }
 
+/* Restyles the native scrollbar instead of swapping in ui/scroll-area.tsx's
+   Radix ScrollArea: that component needs an ancestor with a *definite*
+   height to size its viewport against, which the grid/bubble/settings
+   scroll containers don't reliably have (they're content-sized, capped by
+   max-height) — restructuring three flex layouts for it isn't worth it
+   when WebView2 (Chromium) already supports ::-webkit-scrollbar directly. */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--muted);
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background-clip: padding-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--muted-foreground);
+  background-clip: padding-box;
+}
+
 /* video-player.tsx already shows its own fallback UI on error, so video.js's
    built-in modal would only ever duplicate it. */
 .video-js .vjs-error-display {

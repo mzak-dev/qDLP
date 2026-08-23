@@ -15,20 +15,12 @@
 // component lifetime and only React (never Video.js) owns whether it exists.
 
 import { useEffect, useRef, useState } from "react";
-import { convertFileSrc } from "@tauri-apps/api/core";
 import videojs from "video.js";
 import type Player from "video.js/dist/types/player";
 import "video.js/dist/video-js.css";
 import { Button } from "@/components/ui/button";
 import { openFile } from "@/lib/api";
-import { isLikelyPlayable } from "@/lib/media";
-import { isTauri } from "@/lib/tauri-env";
-
-function assetSrc(path: string): string {
-  // convertFileSrc reads window.__TAURI_INTERNALS__ unguarded and throws
-  // synchronously outside the real shell (no error boundary above this).
-  return isTauri() ? convertFileSrc(path) : path;
-}
+import { assetSrc, isLikelyPlayable } from "@/lib/media";
 
 export function VideoPlayer({ path }: { path: string }) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -79,7 +71,7 @@ export function VideoPlayer({ path }: { path: string }) {
   const showFallback = !attemptPlayback || failed;
 
   return (
-    <div className="relative aspect-video w-full overflow-hidden rounded-lg bg-black">
+    <div className="relative aspect-video max-h-full w-full overflow-hidden rounded-lg bg-black">
       <div data-vjs-player className="absolute inset-0" style={{ visibility: showFallback ? "hidden" : "visible" }}>
         <div ref={containerRef} className="absolute inset-0" />
       </div>

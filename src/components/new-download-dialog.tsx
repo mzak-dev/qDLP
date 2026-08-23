@@ -1,15 +1,29 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { open as openFolderDialog } from "@tauri-apps/plugin-dialog";
-import { downloadDir } from "@tauri-apps/api/path";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { createDownload, probeUrl } from "@/lib/api";
+import { defaultDownloadDir } from "@/lib/paths";
 import { probeIsPlaylist, probeItemCount, type Probe } from "@/lib/types";
 
-export function NewDownloadDialog({ onCreated }: { onCreated: (jobId: string, url: string, title: string) => void }) {
-  const [open, setOpen] = useState(false);
+export function NewDownloadDialog({
+  onCreated,
+  trigger,
+  open: openProp,
+  onOpenChange,
+}: {
+  onCreated: (jobId: string, url: string, title: string) => void;
+  trigger?: ReactNode;
+  /** Controlled open state for callers with no trigger element of their own
+   *  (the top bar's split button). Uncontrolled when omitted. */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+}) {
+  const [openState, setOpenState] = useState(false);
+  const open = openProp ?? openState;
+  const setOpen = onOpenChange ?? setOpenState;
   const [url, setUrl] = useState("");
   const [dir, setDir] = useState("");
   const [probe, setProbe] = useState<Probe | null>(null);
@@ -19,7 +33,7 @@ export function NewDownloadDialog({ onCreated }: { onCreated: (jobId: string, ur
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    if (open && !dir) void downloadDir().then(setDir).catch(() => {});
+    if (open && !dir) void defaultDownloadDir().then(setDir).catch(() => {});
   }, [open, dir]);
 
   // 500ms debounce mirrors rustyDLP's own probe-while-typing behaviour.
@@ -63,9 +77,7 @@ export function NewDownloadDialog({ onCreated }: { onCreated: (jobId: string, ur
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button>New Download</Button>
-      </DialogTrigger>
+      {trigger !== null && <DialogTrigger asChild>{trigger ?? <Button>New Download</Button>}</DialogTrigger>}
       <DialogContent>
         <DialogHeader>
           <DialogTitle>New Download</DialogTitle>

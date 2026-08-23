@@ -12,13 +12,22 @@ export function NewConvertDialog({
   onCreated,
   defaultSource = "",
   trigger,
+  open: openProp,
+  onOpenChange,
 }: {
   onCreated: (jobId: string, sourcePath: string) => void;
   /** Pre-fills the source, e.g. "Convert" on a finished download's own file. */
   defaultSource?: string;
   trigger?: ReactNode;
+  /** Controlled open state, for callers with no trigger element of their own
+   *  (a context menu item, the split button's dropdown). Uncontrolled
+   *  (own useState) when omitted, driven by `trigger`'s DialogTrigger. */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }) {
-  const [open, setOpen] = useState(false);
+  const [openState, setOpenState] = useState(false);
+  const open = openProp ?? openState;
+  const setOpen = onOpenChange ?? setOpenState;
   const [source, setSource] = useState(defaultSource);
   const [format, setFormat] = useState<ConvertFormat>("mp4");
   const [busy, setBusy] = useState(false);
@@ -56,7 +65,7 @@ export function NewConvertDialog({
         if (next) setSource(defaultSource);
       }}
     >
-      <DialogTrigger asChild>{trigger ?? <Button variant="outline">New Convert</Button>}</DialogTrigger>
+      {trigger !== null && <DialogTrigger asChild>{trigger ?? <Button variant="outline">New Convert</Button>}</DialogTrigger>}
       <DialogContent>
         <DialogHeader>
           <DialogTitle>New Convert</DialogTitle>
