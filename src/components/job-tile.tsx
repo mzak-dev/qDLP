@@ -10,7 +10,7 @@
 // animation inside a layout-animated parent, but not sharing one prop
 // between both roles.
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { motion, Reorder } from "framer-motion";
 import { Download, FileVideo2 } from "lucide-react";
 import { JobContextMenu } from "@/components/job-context-menu";
@@ -27,11 +27,32 @@ function statusLabel(job: Job): string {
   return job.kind === "convert" ? "Converted" : "Downloaded";
 }
 
-export function JobTile({ job, open, onOpen }: { job: Job; open: boolean; onOpen: () => void }) {
+export function JobTile({
+  job,
+  open,
+  onOpen,
+  focused,
+  onFocus,
+}: {
+  job: Job;
+  open: boolean;
+  onOpen: () => void;
+  /** Roving-tabindex state (job-grid.tsx) — arrow keys move this, not a per-tile listener. */
+  focused: boolean;
+  onFocus: () => void;
+}) {
   const { liveIds, onSettled } = useJobsContext();
   const [hovering, setHovering] = useState(false);
+  const boxRef = useRef<HTMLDivElement>(null);
   const video = firstVideoFile(job);
   const failed = job.state === "failed" || job.state === "cancelled";
+
+  // Arrow-key navigation only updates React state; the actual DOM focus
+  // has to be moved explicitly (Tab-driven focus already does this itself,
+  // so re-focusing an already-focused element here is just a harmless no-op).
+  useEffect(() => {
+    if (focused) boxRef.current?.focus();
+  }, [focused]);
 
   // Prefer YouTube's own CDN over the locally downloaded file (see
   // youtube.ts for why the local one is often already gone), and the
@@ -47,12 +68,17 @@ export function JobTile({ job, open, onOpen }: { job: Job; open: boolean; onOpen
     <Reorder.Item as="div" value={job.id} className="list-none">
       <JobContextMenu job={job}>
         <motion.div
+          ref={boxRef}
           layoutId={job.id}
+          role="button"
+          tabIndex={focused ? 0 : -1}
+          aria-label={job.title || job.url}
           onClick={onOpen}
+          onFocus={onFocus}
           onMouseEnter={() => setHovering(true)}
           onMouseLeave={() => setHovering(false)}
           style={{ opacity: open ? 0 : 1, pointerEvents: open ? "none" : "auto" }}
-          className="group bg-card cursor-pointer overflow-hidden rounded-lg border"
+          className="group bg-card focus-visible:ring-ring cursor-pointer overflow-hidden rounded-lg border outline-none focus-visible:ring-2"
         >
           <div className="bg-muted relative aspect-video overflow-hidden">
             {hovering && video ? (
