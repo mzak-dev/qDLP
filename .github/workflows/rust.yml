@@ -73,6 +73,18 @@ jobs:
           workspaces: src-tauri
       - run: npm ci
       - run: npx tsc --noEmit
+      # tauri-build's build.rs checks that every externalBin resource in
+      # tauri.conf.json exists on disk and fails the whole crate build if
+      # not — even for clippy/test, which never execute them. These empty
+      # stand-ins satisfy that check only; they're not shipped anywhere
+      # (see README's Bundled binaries section for how real ones are
+      # sourced for an actual `tauri build`).
+      - shell: bash
+        run: |
+          mkdir -p src-tauri/binaries
+          for bin in yt-dlp ffmpeg ffprobe; do
+            : > "src-tauri/binaries/${bin}-x86_64-pc-windows-msvc.exe"
+          done
       - run: cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
       - run: cargo test --manifest-path src-tauri/Cargo.toml
 
