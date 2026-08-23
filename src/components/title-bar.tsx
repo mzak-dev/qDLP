@@ -21,10 +21,10 @@
 // bounding box — including its own empty padding — so the two spacer divs
 // below are explicitly tagged rather than relying on being "empty".
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Link } from "react-router-dom";
-import { getCurrentWindow } from "@tauri-apps/api/window";
+import { currentMonitor, getCurrentWindow, type PhysicalPosition, type PhysicalSize, type Window } from "@tauri-apps/api/window";
 import { ChevronDown, Copy, HelpCircle, Minus, Plus, Settings as SettingsIcon, Square, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -39,6 +39,16 @@ function currentWindow() {
   return isTauri() ? getCurrentWindow() : null;
 }
 
+/** Sizes/positions the window to exactly its monitor's work area — see the
+ *  longer comment on TitleBar's maximize handling for why this replaces
+ *  native maximize instead of just calling it. */
+async function goToWorkArea(win: Window) {
+  const monitor = await currentMonitor();
+  if (!monitor) return;
+  await win.setPosition(monitor.workArea.position);
+  await win.setSize(monitor.workArea.size);
+}
+
 export function TitleBar({ onCreated }: { onCreated?: (jobId: string, urlOrPath: string, title: string, kind: JobKind) => void }) {
   const [maximized, setMaximized] = useState(false);
   const [downloadOpen, setDownloadOpen] = useState(false);
@@ -47,13 +57,67 @@ export function TitleBar({ onCreated }: { onCreated?: (jobId: string, urlOrPath:
   const showGridControls = useLocation().pathname === "/" && onCreated;
   const navigate = useNavigate();
 
+  // decorations:false on Windows means DWM still reserves its normal
+  // invisible resize border around a *maximized* window (it just doesn't
+  // paint it) — most content silently absorbs those few pixels, but
+  // anything sized via the real Fullscreen API (video.js's own fullscreen
+  // button) expects to align exactly with the screen, and that phantom
+  // border is exactly where a several-to-tens-of-pixels gap shows up.
+  // Native maximize is replaced with sizing/positioning to the monitor's
+  // exact work area ourselves (goToWorkArea, above), which doesn't have
+  // this border at all. lastNormalBounds is kept up to date on every
+  // non-maximized resize/move so "restore" has something to go back to
+  // even when maximize was triggered by double-clicking the drag region or
+  // a Windows Snap, not just our own button — both of those still call the
+  // *native* maximize, which this effect catches and immediately corrects.
+  const lastNormalBounds = useRef<{ position: PhysicalPosition; size: PhysicalSize } | null>(null);
+  const correcting = useRef(false);
+
   useEffect(() => {
     const win = currentWindow();
     if (!win) return;
-    void win.isMaximized().then(setMaximized);
-    const unlisten = win.onResized(() => void win.isMaximized().then(setMaximized));
-    return () => void unlisten.then((f) => f());
+
+    async function syncFromNativeState() {
+      if (correcting.current) return;
+      const isMax = await win!.isMaximized();
+      if (isMax) {
+        correcting.current = true;
+        await win!.unmaximize();
+        await goToWorkArea(win!);
+        correcting.current = false;
+        setMaximized(true);
+      } else {
+        lastNormalBounds.current = { position: await win!.outerPosition(), size: await win!.outerSize() };
+        setMaximized(false);
+      }
+    }
+
+    void syncFromNativeState();
+    const unlistenResize = win.onResized(() => void syncFromNativeState());
+    const unlistenMove = win.onMoved(() => void syncFromNativeState());
+    return () => {
+      void unlistenResize.then((f) => f());
+      void unlistenMove.then((f) => f());
+    };
   }, []);
+
+  async function toggleMaximize() {
+    const win = currentWindow();
+    if (!win) return;
+    correcting.current = true;
+    if (maximized) {
+      if (lastNormalBounds.current) {
+        await win.setPosition(lastNormalBounds.current.position);
+        await win.setSize(lastNormalBounds.current.size);
+      }
+      setMaximized(false);
+    } else {
+      lastNormalBounds.current = { position: await win.outerPosition(), size: await win.outerSize() };
+      await goToWorkArea(win);
+      setMaximized(true);
+    }
+    correcting.current = false;
+  }
 
   // Global app shortcuts: New Download/Convert only make sense (and only
   // have a dialog mounted) on the grid, Settings and Help work from
@@ -132,7 +196,7 @@ export function TitleBar({ onCreated }: { onCreated?: (jobId: string, urlOrPath:
           <Minus className="size-4" />
         </button>
         <button
-          onClick={() => void currentWindow()?.toggleMaximize()}
+          onClick={() => void toggleMaximize()}
           className="hover:bg-muted flex h-full w-11 items-center justify-center transition-colors"
           aria-label={maximized ? "Restore" : "Maximize"}
         >
