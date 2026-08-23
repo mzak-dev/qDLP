@@ -2,22 +2,46 @@
 // = false) with our own, styled to match the rest of the app instead of
 // standing out as native chrome bolted onto a custom UI.
 //
+// The grid's own controls (Settings gear, the New Download/Convert split
+// button) live in this same row rather than a separate bar underneath —
+// there's no per-job sidebar footer anymore for them to sit in, and a
+// second full-width row under a 9-36px title bar reads as redundant chrome.
+// They're hidden on /settings: that route has its own back button already
+// (routes/settings.tsx), and "New Download" has nothing to do with it.
+//
 // data-tauri-drag-region makes the bar itself draggable (and
 // double-click-to-maximize, for free) — Tauri excludes real interactive
 // elements like the buttons below from that behavior automatically, so
 // nothing here needs pointer-event gymnastics to keep them clickable.
+//
+// The attribute does NOT cascade to descendants the way a CSS property
+// would: Tauri's drag handler only fires when the exact clicked element
+// carries data-tauri-drag-region. A plain wrapper div around the grid
+// controls (no attribute of its own) silently eats every click in its
+// bounding box — including its own empty padding — so the two spacer divs
+// below are explicitly tagged rather than relying on being "empty".
 
 import { useEffect, useState } from "react";
+import { useLocation } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { Copy, Minus, Square, X } from "lucide-react";
+import { ChevronDown, Copy, Minus, Plus, Settings as SettingsIcon, Square, X } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { NewDownloadDialog } from "@/components/new-download-dialog";
+import { NewConvertDialog } from "@/components/new-convert-dialog";
 import { isTauri } from "@/lib/tauri-env";
+import type { JobKind } from "@/lib/types";
 
 function currentWindow() {
   return isTauri() ? getCurrentWindow() : null;
 }
 
-export function TitleBar() {
+export function TitleBar({ onCreated }: { onCreated?: (jobId: string, urlOrPath: string, title: string, kind: JobKind) => void }) {
   const [maximized, setMaximized] = useState(false);
+  const [downloadOpen, setDownloadOpen] = useState(false);
+  const [convertOpen, setConvertOpen] = useState(false);
+  const showGridControls = useLocation().pathname === "/" && onCreated;
 
   useEffect(() => {
     const win = currentWindow();
@@ -28,8 +52,47 @@ export function TitleBar() {
   }, []);
 
   return (
-    <div data-tauri-drag-region className="flex h-9 shrink-0 select-none items-center justify-between border-b pl-4">
+    <div data-tauri-drag-region className="flex h-11 shrink-0 select-none items-center border-b pl-4">
       <span className="pointer-events-none text-sm font-semibold tracking-tight">qDLP</span>
+
+      <div data-tauri-drag-region className="h-full flex-1" />
+
+      {showGridControls && (
+        <div className="flex items-center gap-2">
+          <Button asChild size="icon-sm" variant="ghost" aria-label="Settings">
+            <Link to="/settings">
+              <SettingsIcon className="size-4" />
+            </Link>
+          </Button>
+
+          <div className="flex">
+            <Button size="sm" className="rounded-r-none" onClick={() => setDownloadOpen(true)}>
+              <Plus className="size-4" /> New Download
+            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button size="sm" className="border-primary-foreground/20 rounded-l-none border-l px-1.5" aria-label="More create options">
+                  <ChevronDown className="size-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onSelect={() => setConvertOpen(true)}>New Convert</DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+
+          <NewDownloadDialog trigger={null} open={downloadOpen} onOpenChange={setDownloadOpen} onCreated={(id, url, title) => onCreated!(id, url, title, "download")} />
+          <NewConvertDialog
+            trigger={null}
+            open={convertOpen}
+            onOpenChange={setConvertOpen}
+            onCreated={(id, path) => onCreated!(id, path, path.split(/[\\/]/).pop() ?? path, "convert")}
+          />
+        </div>
+      )}
+
+      <div data-tauri-drag-region className="h-full w-3" />
+
       <div className="flex h-full">
         <button
           onClick={() => void currentWindow()?.minimize()}

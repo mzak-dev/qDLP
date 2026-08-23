@@ -1,7 +1,10 @@
 import * as React from "react"
 import { Progress as ProgressPrimitive } from "radix-ui"
+import { motion } from "framer-motion"
 
 import { cn } from "@/lib/utils"
+
+const MotionIndicator = motion.create(ProgressPrimitive.Indicator)
 
 function Progress({
   className,
@@ -17,10 +20,11 @@ function Progress({
       )}
       {...props}
     >
-      <ProgressPrimitive.Indicator
+      <MotionIndicator
         data-slot="progress-indicator"
-        className="size-full flex-1 bg-primary transition-all"
-        style={{ transform: `translateX(-${100 - (value || 0)}%)` }}
+        className="size-full flex-1 bg-primary"
+        animate={{ x: `-${100 - (value || 0)}%` }}
+        transition={{ type: "spring", stiffness: 300, damping: 30 }}
       />
     </ProgressPrimitive.Root>
   )

@@ -7,7 +7,8 @@
 // YtdlpOptions's fifteen fields on the first pass.
 
 import { useEffect, useState } from "react";
-import { FolderOpen, Star, Trash2 } from "lucide-react";
+import { Link } from "react-router-dom";
+import { ArrowLeft, FolderOpen, Star, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,6 +19,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { open as openFolderDialog } from "@tauri-apps/plugin-dialog";
 import { deletePreset, getSetting, listPresets, openBinDir, savePreset, setSetting, updateYtdlp } from "@/lib/api";
+import { defaultDownloadDir } from "@/lib/paths";
+import { useTheme } from "@/lib/theme";
+import type { ThemePreference } from "@/lib/theme";
 import type { FormatMode, Preset, YtdlpOptions } from "@/lib/types";
 
 const DEFAULT_OPTIONS: YtdlpOptions = {
@@ -48,6 +52,7 @@ function toSimpleFormat(f: FormatMode): SimpleFormat {
 }
 
 export default function Settings() {
+  const { preference, setPreference } = useTheme();
   const [downloadDir, setDownloadDir] = useState("");
   const [presets, setPresets] = useState<Preset[]>([]);
   const [ytdlpStatus, setYtdlpStatus] = useState<string | null>(null);
@@ -55,7 +60,10 @@ export default function Settings() {
   const [draft, setDraft] = useState<Preset | null>(null);
 
   useEffect(() => {
-    void getSetting("download_dir").then((v) => setDownloadDir(v ?? ""));
+    void getSetting("download_dir").then((v) => {
+      if (v) setDownloadDir(v);
+      else void defaultDownloadDir().then(setDownloadDir);
+    });
     void listPresets().then(setPresets);
   }, []);
 
@@ -105,6 +113,11 @@ export default function Settings() {
 
   return (
     <div className="mx-auto h-full max-w-2xl overflow-y-auto p-6">
+      <Button asChild variant="ghost" size="icon" className="mb-3" aria-label="Back">
+        <Link to="/">
+          <ArrowLeft className="size-4" />
+        </Link>
+      </Button>
       <h1 className="mb-6 text-lg font-semibold">Settings</h1>
 
       <Tabs defaultValue="general">
@@ -114,6 +127,22 @@ export default function Settings() {
         </TabsList>
 
         <TabsContent value="general" className="flex flex-col gap-6">
+          <div className="space-y-1.5">
+            <Label>Theme</Label>
+            <Select value={preference} onValueChange={(v: ThemePreference) => setPreference(v)}>
+              <SelectTrigger className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="light">Light</SelectItem>
+                <SelectItem value="dark">Dark</SelectItem>
+                <SelectItem value="system">System</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <Separator />
+
           <div className="space-y-1.5">
             <Label>Default download folder</Label>
             <div className="flex gap-2">
