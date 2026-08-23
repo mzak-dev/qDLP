@@ -124,12 +124,6 @@ pub fn ffmpeg_path(override_path: Option<&Path>) -> Result<PathBuf> {
         .ok_or_else(|| anyhow!("ffmpeg not found in bin dir, next to the exe, or on PATH"))
 }
 
-/// ffprobe ships in the same archive as ffmpeg in every common distribution.
-pub fn ffprobe_path(override_path: Option<&Path>) -> Result<PathBuf> {
-    resolve("ffprobe", override_path)
-        .ok_or_else(|| anyhow!("ffprobe not found in bin dir, next to the exe, or on PATH"))
-}
-
 pub(crate) fn base_command(exe: &Path) -> Command {
     let mut c = Command::new(exe);
     // Without this a console window flashes on every spawn — including the
@@ -285,8 +279,7 @@ pub fn update_ytdlp(exe: PathBuf) -> oneshot::Receiver<Result<String>> {
             let combined = format!("{text}{err}");
             let last = combined
                 .lines()
-                .filter(|l| !l.trim().is_empty())
-                .next_back()
+                .rfind(|l| !l.trim().is_empty())
                 .unwrap_or("yt-dlp reported nothing")
                 .to_string();
             if out.status.success() {

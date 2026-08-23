@@ -9,13 +9,6 @@
 
 use crate::model::{FileKind, JobState};
 
-/// Single definition of "still working". The sidebar filter and the detail
-/// pane's Cancel button previously each had their own copy and had already
-/// drifted — one counted Probing, the other didn't.
-pub fn is_active(state: JobState) -> bool {
-    matches!(state, JobState::Queued | JobState::Probing | JobState::Running)
-}
-
 /// Only a job that stopped short can be retried; Done has nothing to redo.
 pub fn is_retryable(state: JobState) -> bool {
     matches!(state, JobState::Failed | JobState::Cancelled)
@@ -56,10 +49,6 @@ pub fn sibling_thumbnail(media_path: &str) -> Option<String> {
         }
     }
     None
-}
-
-pub fn file_name(path: &str) -> String {
-    path.rsplit(['\\', '/']).next().unwrap_or(path).to_string()
 }
 
 #[cfg(test)]
