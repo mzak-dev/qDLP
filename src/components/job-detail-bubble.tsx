@@ -5,7 +5,7 @@
 // fullscreen) collapse that one element back down into the tile it grew
 // from — one shared element, one exit animation, regardless of stage.
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { ArrowLeft, ArrowLeftRight, ExternalLink, FolderOpen, Maximize2, RotateCcw, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -13,19 +13,58 @@ import { JobProgress } from "@/components/job-progress";
 import { VideoPlayer } from "@/components/video-player";
 import { NewConvertDialog } from "@/components/new-convert-dialog";
 import { openFile, revealFile } from "@/lib/api";
+import { isTypingOrInDialog, modKey } from "@/lib/keyboard";
 import { firstVideoFile, isActive, isRetryable, type Job } from "@/lib/types";
 import { useJobsContext } from "@/lib/jobs-context";
+
+// How long the manual fade-out (below) runs before the parent actually
+// unmounts this component — kept in one place so the timeout matches the
+// transition duration it's covering for.
+const CLOSE_MS = 150;
 
 export function JobDetailBubble({ job, onClose }: { job: Job; onClose: () => void }) {
   const { liveIds, onSettled, onRetry, onDelete, onCreated } = useJobsContext();
   const [fullscreen, setFullscreen] = useState(false);
   const [convertOpen, setConvertOpen] = useState(false);
+  // ponytail: this component isn't wrapped in AnimatePresence (job-grid.tsx
+  // renders it as a plain `{openJob && <JobDetailBubble/>}`) — AnimatePresence
+  // here got stuck permanently mid-exit and never actually unmounted the
+  // component, confirmed by inspecting React's own committed state (openId
+  // was already null) while the DOM node lingered regardless of whether
+  // layoutId was present. Root cause not fully tracked down (likely an
+  // interaction between AnimatePresence and this fragment's multiple
+  // motion.div children); a manual fade is simple and, unlike
+  // AnimatePresence, doesn't depend on framer-motion's exit machinery
+  // actually completing correctly.
+  const [closing, setClosing] = useState(false);
   const video = firstVideoFile(job);
 
   function close() {
-    setFullscreen(false);
-    onClose();
+    setClosing(true);
+    setTimeout(() => {
+      setFullscreen(false);
+      onClose();
+    }, CLOSE_MS);
   }
+
+  // Escape always closes outright (not "back out of fullscreen first") —
+  // the more common modal convention, and the maximize/back buttons above
+  // already cover the step-by-step path for anyone who wants that instead.
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if (isTypingOrInDialog(e.target)) return;
+      if (e.key === "Escape") {
+        close();
+      } else if (modKey(e) && (e.key === "Delete" || e.key === "Backspace")) {
+        e.preventDefault();
+        onDelete(job);
+        close();
+      }
+    }
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [job.id]);
 
   return (
     <>
@@ -35,14 +74,15 @@ export function JobDetailBubble({ job, onClose }: { job: Job; onClose: () => voi
           window controls) stays visible and clickable above it. */}
       <motion.div
         initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
+        animate={{ opacity: closing ? 0 : 1 }}
+        transition={{ duration: CLOSE_MS / 1000 }}
         onClick={close}
         className="absolute inset-0 z-40 bg-black/60"
       />
       <motion.div
         layoutId={job.id}
-        transition={{ type: "spring", bounce: 0.2, duration: 0.4 }}
+        animate={closing ? { opacity: 0 } : { opacity: 1 }}
+        transition={closing ? { duration: CLOSE_MS / 1000 } : { type: "spring", bounce: 0.2, duration: 0.4 }}
         className={
           fullscreen
             ? "bg-background absolute inset-0 z-50 flex flex-col overflow-y-auto"
