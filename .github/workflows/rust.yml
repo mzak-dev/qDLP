@@ -5,11 +5,61 @@ on:
     branches: [main]
   pull_request:
 
-# Only the release job writes anything; everything else is read-only.
+# Only the version and release jobs write anything; everything else is read-only.
 permissions:
   contents: read
 
 jobs:
+  # Cargo.toml is the single source of truth for the version (see the build
+  # job below). If a push to main didn't touch it, nothing else did either,
+  # so bump the patch number here before build/release run — otherwise a
+  # second unbumped push would fail release's tag-create step with "tag
+  # already exists".
+  version:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      sha: ${{ steps.bump.outputs.sha }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - id: bump
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          current=$(grep -m1 '^version = ' src-tauri/Cargo.toml | cut -d '"' -f2)
+
+          previous=""
+          if git cat-file -e "${{ github.event.before }}:src-tauri/Cargo.toml" 2>/dev/null; then
+            previous=$(git show "${{ github.event.before }}:src-tauri/Cargo.toml" | grep -m1 '^version = ' | cut -d '"' -f2)
+          fi
+
+          if [ -n "$previous" ] && [ "$previous" != "$current" ]; then
+            echo "Version already bumped ($previous -> $current); leaving it alone."
+            echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          IFS='.' read -r major minor patch <<< "$current"
+          new="$major.$minor.$((patch + 1))"
+
+          sed -i "0,/^version = \"[^\"]*\"/s//version = \"$new\"/" src-tauri/Cargo.toml
+          sed -i -z "s/name = \"qdlp\"\nversion = \"[^\"]*\"/name = \"qdlp\"\nversion = \"$new\"/" src-tauri/Cargo.lock
+          sed -i "0,/\"version\": \"[^\"]*\"/s//\"version\": \"$new\"/" package.json
+          sed -i "0,/\"version\": \"[^\"]*\"/s//\"version\": \"$new\"/" src-tauri/tauri.conf.json
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add src-tauri/Cargo.toml src-tauri/Cargo.lock package.json src-tauri/tauri.conf.json
+          git commit -m "chore(release): bump version to $new [skip ci]"
+          git push origin "HEAD:${{ github.ref }}"
+
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
   test:
     runs-on: windows-latest # runner.rs is cfg(windows) top to bottom; nothing else can build it
     steps:
@@ -28,12 +78,17 @@ jobs:
       - run: cargo test --manifest-path src-tauri/Cargo.toml
 
   build:
-    needs: test
+    needs: [test, version]
+    # version is only gated to push events (see above), so PR runs see it
+    # skipped rather than successful — don't require success() on it here.
+    if: ${{ !cancelled() && needs.test.result == 'success' && (needs.version.result == 'success' || needs.version.result == 'skipped') }}
     runs-on: windows-latest
     outputs:
       version: ${{ steps.version.outputs.version }}
     steps:
       - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event_name == 'push' && needs.version.outputs.sha || github.sha }}
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
@@ -56,8 +111,8 @@ jobs:
           path: src-tauri/target/release/bundle/nsis/*.exe
 
   release:
-    if: github.event_name == 'push'
-    needs: build
+    if: github.event_name == 'push' && needs.build.result == 'success' && needs.version.result == 'success'
+    needs: [build, version]
     runs-on: ubuntu-latest
     permissions:
       contents: write # creates the tag and the release
@@ -69,4 +124,5 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
           VERSION: ${{ needs.build.outputs.version }}
-        run: gh release create "v$VERSION" --target "$GITHUB_SHA" --generate-notes ./*.exe
+          TARGET_SHA: ${{ needs.version.outputs.sha }}
+        run: gh release create "v$VERSION" --target "$TARGET_SHA" --generate-notes ./*.exe
