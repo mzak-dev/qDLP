@@ -30,3 +30,13 @@ pnpm tauri build
 ```
 
 Produces an NSIS installer under `src-tauri/target/release/bundle/nsis/`.
+
+## CI/CD
+
+`.github/workflows/rust.yml` runs on every push to `main` and every PR:
+
+1. **test** — `tsc --noEmit`, `cargo clippy -D warnings`, `cargo test`
+2. **build** — `pnpm tauri build`, uploaded as a workflow artifact
+3. **release** _(push to `main` only)_ — tags and publishes a GitHub release with the installer attached
+
+`src-tauri/Cargo.toml` is the single source of truth for the version. On a push to `main`, if that version wasn't changed by the push, CI bumps the patch number (`0.0.1`) automatically and commits it back before building — so releases never collide on a stale tag. Bump the version yourself (any segment) in a commit to opt out of the auto-bump for that push.
