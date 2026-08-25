@@ -252,6 +252,9 @@ pub struct Progress {
     pub fragment_count: Option<u64>,
 }
 
+// Exercised by tests below; no command currently calls these from production
+// code — the frontend computes progress display from the raw fields itself.
+#[allow(dead_code)]
 impl Progress {
     /// 0.0..=1.0, preferring the exact total and falling back to the estimate.
     /// `None` when the size is genuinely unknown (live streams, some HLS).
