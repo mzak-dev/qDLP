@@ -124,12 +124,6 @@ pub fn ffmpeg_path(override_path: Option<&Path>) -> Result<PathBuf> {
         .ok_or_else(|| anyhow!("ffmpeg not found in bin dir, next to the exe, or on PATH"))
 }
 
-/// ffprobe ships in the same archive as ffmpeg in every common distribution.
-pub fn ffprobe_path(override_path: Option<&Path>) -> Result<PathBuf> {
-    resolve("ffprobe", override_path)
-        .ok_or_else(|| anyhow!("ffprobe not found in bin dir, next to the exe, or on PATH"))
-}
-
 pub(crate) fn base_command(exe: &Path) -> Command {
     let mut c = Command::new(exe);
     // Without this a console window flashes on every spawn — including the
@@ -190,6 +184,10 @@ pub struct Thumbnail {
     pub url: Option<String>,
 }
 
+// Exercised by tests below; no command currently calls these from production
+// code — the frontend derives the same thing from the raw
+// `kind`/`entries`/`playlist_count` fields instead.
+#[allow(dead_code)]
 impl Probe {
     pub fn is_playlist(&self) -> bool {
         self.kind.as_deref() == Some("playlist")
@@ -285,8 +283,7 @@ pub fn update_ytdlp(exe: PathBuf) -> oneshot::Receiver<Result<String>> {
             let combined = format!("{text}{err}");
             let last = combined
                 .lines()
-                .filter(|l| !l.trim().is_empty())
-                .next_back()
+                .rfind(|l| !l.trim().is_empty())
                 .unwrap_or("yt-dlp reported nothing")
                 .to_string();
             if out.status.success() {
@@ -379,6 +376,9 @@ pub enum ConvertFormat {
 }
 
 impl ConvertFormat {
+    // No command currently calls these from production code — the frontend
+    // has its own list of convert options with its own labels.
+    #[allow(dead_code)]
     pub const ALL: [ConvertFormat; 4] = [
         Self::Mp4H264Aac,
         Self::MkvH264Aac,
@@ -406,6 +406,7 @@ impl ConvertFormat {
         }
     }
 
+    #[allow(dead_code)]
     pub fn label(self) -> &'static str {
         match self {
             Self::Mp4H264Aac => "MP4 (H.264/AAC)",

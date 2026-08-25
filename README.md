@@ -11,8 +11,8 @@ A native Windows desktop app wrapping `yt-dlp` and `ffmpeg` — paste a URL, get
 ## Development
 
 ```bash
-pnpm install
-pnpm tauri dev
+npm install
+npm run tauri -- dev
 ```
 
 Requires the Rust toolchain and the [Tauri prerequisites](https://tauri.app/start/prerequisites/) for Windows.
@@ -21,12 +21,22 @@ Backend tests: `cargo test --manifest-path src-tauri/Cargo.toml` (two are `#[ign
 
 ## Bundled binaries
 
-`yt-dlp`, `ffmpeg`, and `ffprobe` ship via Tauri's `externalBin` from `src-tauri/binaries/<name>-x86_64-pc-windows-msvc.exe`. On first run, `seed.rs` copies them into `%LOCALAPPDATA%\qDLP\bin` — the writable location `yt-dlp -U` self-updates from without elevation. Populate `src-tauri/binaries/` before running `pnpm tauri build`; it's gitignored.
+`yt-dlp`, `ffmpeg`, and `ffprobe` ship via Tauri's `externalBin` from `src-tauri/binaries/<name>-x86_64-pc-windows-msvc.exe`. On first run, `seed.rs` copies them into `%LOCALAPPDATA%\qDLP\bin` — the writable location `yt-dlp -U` self-updates from without elevation. Populate `src-tauri/binaries/` before running `npm run tauri -- build`; it's gitignored.
 
 ## Building
 
 ```bash
-pnpm tauri build
+npm run tauri -- build
 ```
 
 Produces an NSIS installer under `src-tauri/target/release/bundle/nsis/`.
+
+## CI/CD
+
+`.github/workflows/rust.yml` runs on every push to `main` and every PR:
+
+1. **test** — `tsc --noEmit`, `cargo clippy -D warnings`, `cargo test`
+2. **build** — `npx tauri build`, uploaded as a workflow artifact
+3. **release** _(push to `main` only)_ — tags and publishes a GitHub release with the installer attached
+
+`src-tauri/Cargo.toml` is the single source of truth for the version. On a push to `main`, if that version wasn't changed by the push, CI bumps the patch number (`0.0.1`) automatically and commits it back before building — so releases never collide on a stale tag. Bump the version yourself (any segment) in a commit to opt out of the auto-bump for that push.

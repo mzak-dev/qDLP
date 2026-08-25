@@ -10,20 +10,15 @@ use serde::{Deserialize, Serialize};
 // Options -> argv
 // ---------------------------------------------------------------------------
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub enum FormatMode {
     /// Best video + best audio, merged.
+    #[default]
     BestVideoAudio,
     /// Strip to audio and transcode to `codec` (mp3, m4a, opus, ...).
     AudioOnly { codec: String },
     /// Raw `-f` selector, for people who know yt-dlp's format language.
     Custom(String),
-}
-
-impl Default for FormatMode {
-    fn default() -> Self {
-        Self::BestVideoAudio
-    }
 }
 
 /// The curated slice of yt-dlp's surface that gets real widgets, plus
@@ -257,6 +252,9 @@ pub struct Progress {
     pub fragment_count: Option<u64>,
 }
 
+// Exercised by tests below; no command currently calls these from production
+// code — the frontend computes progress display from the raw fields itself.
+#[allow(dead_code)]
 impl Progress {
     /// 0.0..=1.0, preferring the exact total and falling back to the estimate.
     /// `None` when the size is genuinely unknown (live streams, some HLS).
